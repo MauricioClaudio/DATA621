@@ -1,0 +1,433 @@
+---
+title: "Assessing the impact of age, race and sex on police vehicular stop outcomes in two New England states"
+author: "Claudio, Mauricio"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+---
+
+# Abstract
+We assess the impact of driver age, race and sex on police vehicular outcomes -- warning, citation or arrest, and whether a search is conducted -- in the U.S. states of Connecticut and Massachusetts for the period 2013-2015 from data of approximately 2.15 million stops. We ask the question, *How do driver age, race and sex impact the outcomes of police vehicular stops?*. To answer it, we use multinomial and binary logistic regression models to derive the odds of incidence for each outcome relative to the white/male reference group. We do so in order to provide insights into policing in the United States and to highlight possible areas of reform and advocacy. The findings suggest that age, race and gender do impact police vehicular stops differentially, with race having the greatest impact. Specifically we find that persons in the Black and Hispanic groups are much more likely to be issued citations or be arrested than the reference group, women are much more likely to receive a warning and avoid  citation and arrest and age plays a less significant role relative to race and sex in vehicular stop outcomes. We also find that Blacks and Hispanics have higher odds of being the subject of a vehicular search but have lower odds of carrying contraband. The findings point to a continued need for vigilance, and reform and improvements in law enforcement.  
+
+*Key words*: police bias, vehicular stop outcomes, minority group policing, New England law enforcement, multinomial logistic regression
+
+
+# Introduction
+Every day tens of thousands of vehicular traffic stops are made by law enforcement officials throughout the United States. Due to their transient nature and often isolated nature, these transactions have largely escaped public scrutiny and accountability. The absence of legal reporting requirements and a culture of obscurity together with large administrative backlogs conspire to shroud these every day interactions between citizens and law enforcement officials from the public eye.
+
+Only recently in the last decade have police vehicular stops drawn attention in a systematic manner as an issue of urgent attention, catalyzed by increasing ubiquity of video recording, data availability and media coverage of events where these seemingly routine interactions often turn deadly. Legal reporting requirements remain spotty throughout the country due in part to the dispersed nature of law enforcement in the country. For example, the Massachusetts State Patrol maintains and reports relatively complete data, but data of similar scope is hard to come by for the state cities of Boston, Springfield, etc. In the jurisdictions where legal requirements do exist, the data is often incomplete or only captures a small subset of variables. However, a few states, most notably North Carolina, have enacted laws mandating the recording and reporting of these transactions.  
+
+The present study seeks to shed light on this relatively unexplored topic in law enforcement, capitalizing on the recent improvements in legal requirements and availability of data. The issue is germane to the on-going debate on the scope, funding and oversight of law enforcement and generally to the state of civil rights and the government accountability in the United States. We assess the impact of driver age, gender and race on the outcomes of police vehicular stops for the period 2013-2015 in the states of Connecticut and Massachusetts. Together, the two states account for more than two thirds of the population of the New England region. We ask the question, *Does driver age, race and sex factor in police vehicular stops? If so, how?* In the case of vehicular search, we ask the subsidiary question, *What is the relation between the rates of vehicular search and the rate of contraband found in the search?* To answer it, we use the data collected by the [Stanford Open Policing Project](https://openpolicing.stanford.edu/) drawn from the state-wide *State Patrol* data sets for the two states under study.
+
+
+# Literature review
+The Stanford Open Policing Project, the source of the data used for this study, has conducted several studies looking at the issue of police bias in vehicular stops (Stanford Open Policing Project, 2022). It has found significant bias in police work, in particular bias against Hispanic and Black drivers. Similarly, professor Frank Baumgartner at the University of Carolina at Chapel Hill found significant outcome bias in his analysis of vehicular stop data for the state of North Carolina during the period 2002-2020 (Baumgartner, 2022). Using propensity scores rather than regression models, Ridgeway found significant bias in the behavior of police officers during traffic stops (Ridgeway, 2006).
+
+
+# Methodology
+The data consists of 2,149,197 instances, 1,077,519 for Connecticut and  1,071,678 for Massachusetts, representing a police vehicular stop during 2013-2015. Data preparation consisted simply of variable selection and data type conversion, factor re-ordering and the elimination a relatively few missing values.
+  
+The outcomes of police vehicular stops -- warning, citation, arrest -- were modeled for each state with a multinomial logistic regression and three predictor variables: subject_age (numerical discrete), subject_race (categorical) and subject_sex (categorical). The probabilities for each outcome in each state were then plotted for subject_age and subject_race and for subject_age and subject age (Figures 1-4). The model exponentiated coefficients representing the odd-ratios/relative risks for each group are shown in the tables that follow the graphs.
+  
+We modeled whether a search was also conducted during the stop, True or False, with a binary logistic regression and the same three predictor variables: subject_age, subject_race, and subject_sex. Subsequently, in instances where a search was conducted we modeled the probability of finding contraband again with the same three predictor variables. The probabilities for both states and models, search conducted and contraband found, are plotted in Figures 5-8 and the odd-ratios/relative risks for both models in each state are displayed in tables following the graphs.
+
+
+# Experimentation and Results
+All models were built to and achieved general significance at 95% confidence for all predictors, save for a couple of cases where predictor variable significance dropped to 90%. Variance inflation factors were very low in all cases.
+
+## Stop Outcomes
+The results in both states show, unsurprisingly, that the probabilities for each stop outcome vary by age, race and sex. In both states, the probability of a warning increases with age, and the probability of both citation and arrest decreases with age.  
+
+On race, the data in both states shows that Whites and Blacks have higher probability of receiving a warning relative to Hispanics and Asians. In Connecticut, Asians and Hispanics are more likely to receive a citation than Whites and Blacks. In Massachusetts, Asians are more likely to receive a citation than all other groups. When it comes to arrest, the data in both states show that Blacks and Hispanics have a higher probability of being arrested. 
+
+Regarding sex, the data in both states shows that males have a significantly higher probability of warning, citation and arrest than females.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(car)
+library(summarytools)
+library(ggplot2)
+library(sjPlot)
+library(nnet)
+library(blorr)
+
+### CONNECTICUT
+# Load dataset
+CT = readRDS("C:\\Users\\LENOVO\\OneDrive\\Learning\\Courses in progress\\DATA621 Business Analytics & Data Mining\\Project\\data\\SOPP CT.rds")
+
+### Data Prep
+# Subset the required variables
+CT = CT |>
+   filter(date > "2013-01-01",  # Un-comment to subset by date
+      type == "vehicular") |>    # Subset vehicular stop records only
+   dplyr::select(date,  # Select variables of interest
+      subject_age,
+      subject_race,
+      subject_sex,
+      warning_issued,
+      citation_issued,
+      arrest_made,
+      outcome,
+      search_conducted,
+      contraband_found)
+
+# Sort factors with 'white' as reference. Drop 'Asian', 'other' & 'unknown'
+CT$subject_race = factor(CT$subject_race,
+                         c("white","black","hispanic","asian/pacific islander"))
+
+# Remove unneeded levels
+CT$outcome = factor(CT$outcome, c("warning","citation","arrest"))
+
+
+# Drop records with missing values
+CT = CT |>
+   filter(!is.na(subject_age), !is.na(subject_race), !is.na(subject_sex),
+          !is.na(outcome))
+CT$outcome = droplevels(CT$outcome)
+
+# Display data summary
+# print(dfSummary(CT,
+#                 graph.magnif = 0.5,
+#                 plain.ascii = FALSE,
+#                 headings = FALSE,
+#                 display.labels = FALSE,
+#                 silent = TRUE),
+#       method = "browser")
+
+
+### MASSACHUSETTS
+# Load dataset
+MA = readRDS("C:\\Users\\LENOVO\\OneDrive\\Learning\\Courses in progress\\DATA621 Business Analytics & Data Mining\\Project\\data\\SOPP MA.rds")
+
+### Data Prep
+# Subset the required variables
+MA = MA |>
+   filter(date > "2013-01-01",  # Un-comment to subset by data
+      type == "vehicular") |>    # Subset vehicular stop records only
+   dplyr::select(date,                # Select variables of interest
+      subject_age,
+      subject_race,
+      subject_sex,
+      warning_issued,
+      citation_issued,
+      arrest_made,
+      outcome,
+      search_conducted,
+      contraband_found)
+
+# Sort factors with 'white' as reference. Drop 'Asian', 'other' & 'unknown'
+MA$subject_race = factor(MA$subject_race,
+                         c("white","black","hispanic","asian/pacific islander"))
+
+# Drop records with missing values
+MA = MA |>
+   filter(!is.na(subject_age), !is.na(subject_race), !is.na(subject_sex),
+          !is.na(outcome))
+
+# Remove unneeded levels
+MA$outcome = droplevels(MA$outcome)
+
+# # Display data summary
+# print(dfSummary(MA,
+#                 graph.magnif = 0.5,
+#                 plain.ascii = FALSE,
+#                 headings = FALSE,
+#                 display.labels = FALSE,
+#                 silent = TRUE),
+#       method = "browser")
+```
+
+### Connecticut
+```{r echo=FALSE, fig.height=6, fig.width=9, message=FALSE, warning=FALSE}
+### Build Multinomial Regression Models on stop outcome
+# CONNECTICUT
+modCT = multinom(outcome ~ subject_age + subject_race + subject_sex,
+               data = CT, trace=FALSE)
+
+# MASSACHUSETTS
+modMA = multinom(outcome ~ subject_age + subject_race + subject_sex,
+               data = MA, trace=FALSE)
+
+### Plot probabilities
+set_theme(
+   #title.color = "blue4", 
+   title.size = 1.5,
+   axis.textsize = 1,
+   #axis.angle.x = 45, 
+   #axis.textcolor = "blue1", 
+   base = theme_light(),
+   legend.size = 1.0,
+   legend.title.size = 1.5)
+
+# Connecticut
+plot_model(modCT, # Connecticut
+           type = "pred",
+           terms = c("subject_age","subject_race"),
+           title = "Figure 1 - Connecticut\nStop Outcomes by Age and Race",
+           line.size = 2)
+plot_model(modCT, # Connecticut
+           type = "pred",
+           terms = c("subject_age","subject_sex"),
+           title = "Figure 2 - Connecticut\nStop Outcomes by Age and Sex",
+           line.size = 2)
+tab_model(modCT,
+          auto.label = TRUE,
+          collapse.ci = FALSE,
+          show.reflvl = TRUE,
+          p.style = "scientific",
+          prefix.labels = "varname",
+          #transform = "plogis",
+          dv.labels = c("Multinomial Logistic Regression model: Connecticut"),
+          show.ci = FALSE,
+          show.p = TRUE,
+          digits = 3,
+          digits.p = 1)
+```
+  
+### Massachusetts
+```{r echo=FALSE, fig.height=6, fig.width=9, message=FALSE, warning=FALSE}
+# Massachusetts
+plot_model(modMA, # Massachusetts
+           type = "pred",
+           terms = c("subject_age","subject_race"),
+           title = "Figure 3 - Massachusetts\nStop Outcomes by Age and Race",
+           line.size = 2)
+plot_model(modMA, # Massachusetts
+           type = "pred",
+           terms = c("subject_age","subject_sex"),
+           title = "Figure 4 - Massachusetts\nStop Outcomes by Age and Sex",
+           line.size = 2)
+tab_model(modMA,
+          auto.label = TRUE,
+          collapse.ci = FALSE,
+          show.reflvl = TRUE,
+          p.style = "scientific",
+          prefix.labels = "varname",
+          #transform = "plogis",
+          dv.labels = c("Multinomial Logistic Regression model: Massachusetts"),
+          show.ci = FALSE,
+          show.p = TRUE,
+          digits = 3,
+          digits.p = 1)
+
+```
+
+
+## Vehicular Search and Contraband
+When Hispanics and Blacks are stopped on the road, the data in both states shows that they, males and females, have a significantly higher probability of undergoing a search relative to Whites or Asians. Nevertheless, when a search is conducted following a stop, there is a greater probability of finding contraband, not among Blacks and Hispanics, but rather among Whites.
+
+### Connecticut
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+################### Logistic Search Model ##################
+# Convert factor to integer
+CT$search = as.integer(ifelse(CT$search_conducted==TRUE,1,0))
+MA$search = as.integer(ifelse(MA$search_conducted==TRUE,1,0))
+
+# Build and display logistic Search regression model
+modCT.bin = glm(search ~
+                   subject_age + subject_race + subject_sex,
+                data = CT, family=binomial(link="logit"))
+
+modMA.bin = glm(search ~
+                   subject_age + subject_race + subject_sex,
+                data = MA, family=binomial(link="logit"))
+
+################### Logistic Contraband Model ##############
+# Convert factor to integer
+CT$contraband = as.integer(ifelse(CT$contraband_found==TRUE,1,0))
+MA$contraband = as.integer(ifelse(MA$contraband_found==TRUE,1,0))
+
+# Build and display logistic Contraband regression model
+modCTcontra.bin = glm(contraband ~ subject_age + subject_race + subject_sex,
+                data = CT, family=binomial(link="logit"))
+
+modMAcontra.bin = glm(contraband ~ subject_age + subject_race + subject_sex,
+                      data = MA, family=binomial(link="logit"))
+
+# Plot Search & Contraband Probabilities
+# CONNECTICUT
+plot_model(modCT.bin,
+           type = "pred",
+           terms = c("subject_age","subject_race","subject_sex"),
+           title = "Connecticut\nprobability of vehicular search",
+           line.size = 2)
+plot_model(modCTcontra.bin,
+           type = "pred",
+           terms = c("subject_age","subject_race","subject_sex"),
+           title = "Connecticut\nprobability of contraband found in vehicular search",
+           line.size = 2)
+tab_model(modCT.bin, modCTcontra.bin,
+          auto.label = TRUE,
+          collapse.ci = FALSE,
+          show.reflvl = TRUE,
+          p.style = "scientific",
+          prefix.labels = "varname",
+          #transform = "plogis",
+          dv.labels = c("Vehicular Search", "Contraband Found"),
+          show.ci = FALSE,
+          show.p = TRUE,
+          digits = 3,
+          digits.p = 1)
+```
+
+
+### Massachusetts
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# MASSACHUSETTS
+plot_model(modMA.bin,
+           type = "pred",
+           terms = c("subject_age","subject_race","subject_sex"),
+           title = "Massachusetts\nprobability of vehicular search",
+           line.size = 2)
+plot_model(modMAcontra.bin,
+           type = "pred",
+           terms = c("subject_age","subject_race","subject_sex"),
+           title = "Massachusetts\nprobability of contraband found in vehicular search",
+           line.size = 2)
+tab_model(modMA.bin, modMAcontra.bin,
+          auto.label = TRUE,
+          collapse.ci = FALSE,
+          show.reflvl = TRUE,
+          p.style = "scientific",
+          prefix.labels = "varname",
+          #transform = "plogis",
+          dv.labels = c("Vehicular Search", "Contraband Found"),
+          show.ci = FALSE,
+          show.p = TRUE,
+          digits = 3,
+          digits.p = 1)
+```
+
+
+# Discussion and Conclusions
+The general findings suggesting that there is significant bias in vehicular policing is not surprising. In fact, it confirms what many suspect and many others have experienced in their interactions with law enforcement in the United States. Nevertheless, the detail of the findings are intriguing and offer a glimpse into hitherto undiscovered dynamics. For example, warnings are increasingly common with age, suggesting one of two things. One suggestion is that people become worse drivers with age and/or that there is age-ism in vehicular law enforcement. The other, more plausible suggestion is that warnings are more common with age because older folk are decreasingly considered for the more severe penalties of citation and arrest. This suggestion finds support in the fact that citation and arrest become less frequent with age. In any case, age alone with its odds-ratio ranging between 0.98-0.99 for the stop outcomes model and between 0.95-0.97 for the search and contraband models, that is, close to unity, is not a very impactful marginal predictor from age to age, but its cumulative effect across the range of ages is substantial.   
+
+The most impactful predictor and the widest differences among groups are found in the race predictor variable. Here we see odds-ratios consistently above unity for the Black and Hispanic groups, in some cases as high as 2.2 and 2.7 as in the case of arrest in Connecticut and Massachusetts, respectively. The odds-ratios also rise above two in the search conducted model for Hispanics in both states and for Blacks in Connecticut. Conversely, we see odd-ratios significantly below unity in the contraband found model for all non-reference groups. That is, the data suggests that contraband is most frequently found in Whites, but it is Blacks and Hispanics instead who are more often the subject of a vehicular search. The sex predictor is also impactful, showing large differences between males and females for all outcomes For example, the odds-ratio for female citation and arrest in Massachusetts is significantly lower than unity at 0.80 and 0.41, respectively. A similar, albeit less exaggerated trend is seen in Connecticut too.
+
+In summary, age plays a minor incremental role in vehicular stop outcomes from age to age. Its impact is cumulative across the range of ages. Race is the most significant factor impacting stop outcomes, with Blacks and Hispanics seeing the largest increases in odd-ratios relative to the White/male reference group. The data suggests that *Driving while Black* and *Driving while Hispanic* may be quite real. The sex of the driver is also a significant predictor of stop outcomes, with women being less likely than men of all stop outcomes.
+
+**Limitations of the study and areas of future work**  
+The diagnostics performed on the regression models used in the study do assure an acceptable level of statistical rigor of the results presented. Nevertheless, due to the size of the dataset and the computational power required in analyzing it, model diagnostics were not exhaustive in nature and could be expanded for even greater confidence in the results. Likewise, interaction terms among the predictor variables could be explored to improve model fit and explanatory power even further.  
+
+Another possible limitation of the study concerns data collection. The data is collected and reported by the same law enforcement officials performing the vehicular stop and search. It can be reasonably expected that they know that the data will be scrutinized by the public and hence, it can be likewise expected that the data is under-reported or mis-reported. An analysis of the data itself involving triangulation and cross-checks with other sources could be conducted to check this possibility.
+
+There exist other factors that could well impact on who is the subject of a vehicular stop. The location of the stop and the time of the stop could play a significant role. If law enforcement conducts more stops where minority groups are more prevalent, it can only be expected that more minority group members will be stopped. Where law enforcement officials chose to conduct stops could be an important factor. Likewise, the time of the day and whether it's dark or light could have an effect on whether stops are made and who is stopped. We can imagine that under the cover of dark, there could be fewer stops due to the increased real or perceived danger of night-time work. On the other hand, in the cover of dark the age, race and sex of the drive is more difficult to determine from afar before a stop. All these factors are worth investigating to refine the results presented here. 
+
+
+# References
+Stanford Open Policing Project. (2022, May 19). The results of our nationwide analysis of traffic stops and searches. https://openpolicing.stanford.edu/findings/  
+
+Baumgartner, F.R. (2022, February 1). Benchmarking Traffic Stop Data: Examining Patterns in North Carolina and the City of Raleigh. The University of Carolina at Chapel Hill.  
+https://fbaum.unc.edu/TrafficStops/Baumgartner-benchmarking.pdf
+  
+Ridgeway, G. (2006, March 1). Assessing the Effect of Race Bias in Post-traffic Stop Outcomes Using Propensity Scores. Journal of Quantitative Criminology.  
+https://www.jstor.org/stable/23367478
+
+
+
+<br>
+<br>
+
+# Appendices  
+
+## Appendix I: Supplemental figures
+
+### Data Summary: Connecticut
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Display data summary
+print(dfSummary(CT,
+                graph.magnif = 0.5,
+                plain.ascii = FALSE,
+                headings = FALSE,
+                display.labels = FALSE,
+                silent = TRUE),
+      method = "render")
+```
+
+### Model diagnostics: Connecticut
+**|Multinomial model decomposed as three binary models**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+CT.warning = glm(warning_issued ~ subject_age + subject_race + subject_sex,
+                 data = CT, family = binomial(link = "logit"))
+summary(CT.warning)
+vif(CT.warning)
+blr_model_fit_stats(CT.warning)
+
+CT.citation = glm(citation_issued ~ subject_age + subject_race + subject_sex,
+                 data = CT, family = binomial(link = "logit"))
+summary(CT.citation)
+vif(CT.citation)
+blr_model_fit_stats(CT.citation)
+
+CT.arrest = glm(arrest_made ~ subject_age + subject_race + subject_sex,
+                 data = CT, family = binomial(link = "logit"))
+summary(CT.arrest)
+vif(CT.arrest)
+blr_model_fit_stats(CT.arrest)
+```
+
+**|Search model**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(modCT.bin)
+vif(modCT.bin)
+blr_model_fit_stats(modCT.bin)
+```
+**|Contraband model**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(modCTcontra.bin)
+vif(modCTcontra.bin)
+blr_model_fit_stats(modCTcontra.bin)
+```
+
+### Data Summary: Massachusetts
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Display data summary
+print(dfSummary(MA,
+                graph.magnif = 0.5,
+                plain.ascii = FALSE,
+                headings = FALSE,
+                display.labels = FALSE,
+                silent = TRUE),
+      method = "render")
+```
+
+### Model diagnostics: Massachusetts
+**|Multinomial model decomposed as three binary models**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+MA.warning = glm(warning_issued ~ subject_age + subject_race + subject_sex,
+                 data = MA, family = binomial(link = "logit"))
+summary(MA.warning)
+vif(MA.warning)
+blr_model_fit_stats(MA.warning)
+
+MA.citation = glm(citation_issued ~ subject_age + subject_race + subject_sex,
+                 data = MA, family = binomial(link = "logit"))
+summary(MA.citation)
+vif(MA.citation)
+blr_model_fit_stats(MA.citation)
+
+MA.arrest = glm(arrest_made ~ subject_age + subject_race + subject_sex,
+                 data = MA, family = binomial(link = "logit"))
+summary(MA.arrest)
+vif(MA.arrest)
+blr_model_fit_stats(MA.arrest)
+```
+**|Search model**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(modMA.bin)
+vif(modMA.bin)
+blr_model_fit_stats(modMA.bin)
+```
+**|Contraband model**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(modMAcontra.bin)
+vif(modMAcontra.bin)
+blr_model_fit_stats(modMAcontra.bin)
+```
+
+
+## Appendix II: R statistical programming code
+This RMarkdown document and its R code are available for inspection and download [here](https://github.com/MauricioClaudio/DATA621).
+
